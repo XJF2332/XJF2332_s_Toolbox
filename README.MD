@@ -10,6 +10,7 @@
 - gradio
 - pillow
 - send2trash
+- colorama
 
 ## 功能说明
 
