@@ -1,5 +1,4 @@
 import re
-from idlelib.iomenu import encoding
 
 
 def remove_versions_from_requirements(file_path):
