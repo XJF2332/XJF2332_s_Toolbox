@@ -8,8 +8,22 @@ directory = input("请输入包含PNG图像的目录路径：")
 
 del_confirm = input("是否删除原始PNG文件？(Y/[N]): ")
 
+quality = input("请输入JPEG图像的质量（1-[100]）：")
+if quality:
+    try:
+        if int(quality) < 1 or int(quality) > 100:
+            raise ValueError
+        else:
+            quality = int(quality)
+    except ValueError:
+        print("无效的质量值，使用默认值100")
+        quality = 100
+else:
+    quality = 100
+
 # 定义一个函数来处理单个文件的转换和删除
 def process_file(filename, del_confirm):
+    global quality
     file_path = os.path.join(directory, filename)
     with Image.open(file_path) as img:
         if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
@@ -19,7 +33,7 @@ def process_file(filename, del_confirm):
         new_filename = filename[:-4] + '.jpg'
         new_file_path = os.path.join(directory, new_filename)
         img = img.convert('RGB')
-        img.save(new_file_path, 'JPEG', quality=100)
+        img.save(new_file_path, 'JPEG', quality=quality)
         print(f'Converted {filename} to {new_filename}')
 
         if del_confirm.lower() == 'y':
