@@ -43,7 +43,7 @@ def main():
         else:
             print(f"正则表达式未改变：{current_regex_pattern}")
 
-        matching_files = find_files(current_directory, regex_pattern_change)
+        matching_files = find_files(current_directory, current_regex_pattern)
 
         if matching_files:
             print("找到以下匹配的文件:")

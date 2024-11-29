@@ -13,7 +13,7 @@ from colorama import init, Fore
 prompt_text = {
   "1": {
     "inputs": {
-      "image": "0C31687D5DEC5F00072CD49B809B3CBF.jpg",
+      "image": "example.jpg",
       "upload": "image"
     },
     "class_type": "LoadImage",
@@ -95,6 +95,7 @@ model_index = None
 post_downscale_scale = 1
 request_interval = 4
 width_threshold = 1500
+recursive_search = False  # 新增全局变量
 
 #######################
 
@@ -221,6 +222,12 @@ def get_parameters():
             else:
                 print("未修改当前目录")
                 break
+    # 是否递归查找子目录
+    global recursive_search
+    print("-"*50)
+    recursive_search_input = input("是否递归查找子目录中的图片？(Y/[N]): ")
+    recursive_search = recursive_search_input.lower() == 'y'
+    print(f"递归查找设置为：{recursive_search}")
     # -------------------------------------
     # 获取图片阈值
     global width_threshold
@@ -346,51 +353,53 @@ def get_parameters():
 
 #######################
 
-# 定义 queue_prompt 函数
-def queue_prompt(prompt):
-    p = {"prompt": prompt}
-    data = json.dumps(p).encode('utf-8')
-    req = request.Request(f"http://127.0.0.1:{endpoint}/prompt", data=data)
-    request.urlopen(req)
-    time.sleep(request_interval)
-
-#######################
-
 def get_image_files():
     global image_files
     global img_dir
     global last_img_dir
+    global recursive_search
     # 如果列表已存在，且图片目录未被更改，则跳过查找
     if image_files and last_img_dir == img_dir:
         print("图片文件列表已存在，跳过查找")
         pass
     else:
-        # 检查图片文件是否满足以下要求
-        try:
-            image_files = []
-            # 1、是任意非 gif 图像文件，且长宽有至少一个值小于 1500
+        image_files = []
+        # 根据 recursive_search 决定是否递归查找
+        if recursive_search:
+            for root, dirs, files in os.walk(img_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # 检查文件是否符合图片文件的要求
+                    # 1、是任意非 gif 图像文件，且长宽有至少一个值小于 1500
+                    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')) and not file_path.lower().endswith('.gif'):
+                        try:
+                            image = PIL.Image.open(file_path)
+                            if image.size[0] < width_threshold or image.size[1] < height_threshold:
+                                image_files.append(file_path)
+                        except Exception as e:
+                            print(f"无法打开文件 {file_path}: {e}")
+                    # 2、是 jpg 图像文件，且大小小于 700KB
+                    if file_path.lower().endswith(('.jpg', '.jpeg')) and os.path.getsize(file_path) < jpg_size_threshold * 1024:
+                        image_files.append(file_path)
+        else:
+            # 非递归查找，只遍历当前目录
             for file in os.listdir(img_dir):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')) and not file.lower().endswith(
-                        '.gif'):
-                    image_path = os.path.join(img_dir, file)
-                    image = PIL.Image.open(image_path)
-                    if image.size[0] < width_threshold or image.size[1] < height_threshold:
-                        image_files.append(image_path)
-            # 2、是 jpg 图像文件，且大小小于 700KB
-            for file in os.listdir(img_dir):
-                if file.lower().endswith(('.jpg', '.jpeg')):
-                    image_path = os.path.join(img_dir, file)
-                    if os.path.getsize(image_path) < jpg_size_threshold * 1024:
-                        image_files.append(image_path)
-        except FileNotFoundError:
-            print("图片目录不存在")
-        except Exception as e:
-            print(f"发生错误：{e}")
-
-
+                file_path = os.path.join(img_dir, file)
+                if os.path.isfile(file_path):
+                    # 检查文件是否符合图片文件的要求
+                    # 1、是任意非 gif 图像文件，且长宽有至少一个值小于 1500
+                    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')) and not file_path.lower().endswith('.gif'):
+                        try:
+                            image = PIL.Image.open(file_path)
+                            if image.size[0] < width_threshold or image.size[1] < height_threshold:
+                                image_files.append(file_path)
+                        except Exception as e:
+                            print(f"无法打开文件 {file_path}: {e}")
+                    # 2、是 jpg 图像文件，且大小小于 700KB
+                    if file_path.lower().endswith(('.jpg', '.jpeg')) and os.path.getsize(file_path) < jpg_size_threshold * 1024:
+                        image_files.append(file_path)
         # 去除重复值
         image_files = list(set(image_files))
-
         # 判断是否是长图
         for image_file in image_files:
             image = PIL.Image.open(image_file)
@@ -399,21 +408,17 @@ def get_image_files():
                 skip_confirm = input(f"    {image_file} 看起来是长图，要忽略吗([Y]/N): ")
                 if skip_confirm.lower() != 'n':
                     image_files.remove(image_file)
-
         # 转换相对路径为绝对路径
         for i in range(len(image_files)):
             image_files[i] = os.path.abspath(image_files[i])
-
         # 按文件名字母顺序排序
         image_files.sort(key=lambda x: os.path.basename(x))
-
         # 检查是否有图片包含透明度
         for image_file in image_files:
             with PIL.Image.open(image_file) as img:
                 if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
                     image_files.remove(image_file)
                     print(f"    {image_file} 包含透明度，已丢弃。")
-
         # 打印图片文件列表
         print("找到的图片文件列表：")
         for image_file in image_files:
@@ -428,12 +433,11 @@ def send_request():
     # 遍历图片文件并更新 JSON 中的 "image" 值
     for image_file in image_files:
         prompt_text["1"]["inputs"]["image"] = image_file
-        prompt_text["1"]["inputs"]["upload"] = "image"  # 假设这个也应该更新
-
+        prompt_text["1"]["inputs"]["upload"] = "image"
+        prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(image_file))[0]
         # 使用更新后的 JSON 调用 queue_prompt 函数
         queue_prompt(prompt_text)
         print(f"已发送请求：{image_file}")
-
         # 打印图片分辨率和大小
         current_image = PIL.Image.open(image_file)
         print(f"    图片分辨率：{current_image.size}")
@@ -457,11 +461,20 @@ def manual():
     # 手动输入图片路径
     image_file = input("请输入图片路径：")
     prompt_text["1"]["inputs"]["image"] = image_file
-    prompt_text["1"]["inputs"]["upload"] = "image"  # 假设这个也应该更新
-
+    prompt_text["1"]["inputs"]["upload"] = "image"
+    prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(image_file))[0]
     # 使用更新后的 JSON 调用 queue_prompt 函数
     queue_prompt(prompt_text)
     print(f"已发送请求：{image_file}")
+
+#######################
+
+def queue_prompt(prompt):
+    p = {"prompt": prompt}
+    data = json.dumps(p).encode('utf-8')
+    req = request.Request(f"http://127.0.0.1:{endpoint}/prompt", data=data)
+    request.urlopen(req)
+    time.sleep(request_interval)
 
 #######################
 
@@ -487,7 +500,7 @@ def main():
         elif choice == '2':
             break
         else:
-            print("无效的选项，请重新输入。")
+            print("无效的选项，请重新输入。.")
 
 #######################
 
