@@ -8,21 +8,17 @@ from PySide6.QtGui import QFont
 
 
 # 定义一个函数来处理单个文件的转换和删除
-def process_file(full_path, directory, del_confirm, quality, transparency_trans, preserve_metadata, overwrite):
-    with Image.open(full_path) as img:
+def process_file(img_name, directory, del_confirm, quality, transparency_trans, preserve_metadata, overwrite):
+    with Image.open(os.path.join(directory, img_name)) as img:
         if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
             if transparency_trans:
-                print(f'{full_path} 含有透明度，但由于自定义设置仍然进行转换')
+                print(f'{img_name} 含有透明度，但由于自定义设置仍然进行转换')
             else:
-                print(f'跳过 {full_path} ，因为它含有透明度')
+                print(f'跳过 {img_name} ，因为它含有透明度')
                 return
 
         # 生成新的文件路径
-        if full_path.startswith(directory):
-            relative_path = os.path.relpath(os.path.splitext(full_path)[0], directory)
-            new_file_path = os.path.join(directory, relative_path + '.jpg')
-        else:
-            new_file_path = os.path.splitext(full_path)[0] + '.jpg'
+        new_file_path = os.path.join(directory, img_name.replace('.png', '.jpg'))
 
         # 检查文件是否存在
         if os.path.exists(new_file_path) and not overwrite:
@@ -33,17 +29,17 @@ def process_file(full_path, directory, del_confirm, quality, transparency_trans,
             metadata = img.info
             img = img.convert('RGB')
             img.save(new_file_path, 'JPEG', quality=quality, metadata=metadata)
-            print(f'成功转换 {full_path} 为 {new_file_path}')
+            print(f'成功转换 {img_name} 为 {new_file_path}')
         else:
             img = img.convert('RGB')
             img.save(new_file_path, 'JPEG', quality=quality)
-            print(f'成功转换 {full_path} 为 {new_file_path}')
+            print(f'成功转换 {img_name} 为 {new_file_path}')
 
         if del_confirm:
-            send2trash.send2trash(full_path)
-            print(f'已将 {full_path} 发送到回收站')
+            send2trash.send2trash(os.path.join(directory, img_name))
+            print(f'已将 {img_name} 发送到回收站')
         else:
-            print(f'保留原文件：{full_path}')
+            print(f'保留原文件：{img_name}')
 
 
 class ConversionWorker(QThread):
@@ -98,7 +94,7 @@ class MainWindow(QWidget):
         self.overwrite_checkbox = QCheckBox('覆盖已存在的文件')
 
         self.quality_label = QLabel('质量: 100')
-        self.quality_slider = QSlider(Qt.Horizontal)
+        self.quality_slider = QSlider(Qt.Orientation.Horizontal)
         self.quality_slider.setRange(1, 100)
         self.quality_slider.setValue(100)
 
@@ -152,15 +148,14 @@ class MainWindow(QWidget):
         self.recursive = False
         self.overwrite = False
 
-        # 设置样式表
-        self.setStyleSheet('''
-            QSlider::groove:horizontal{ 
-                height: 10px; 
-                left: 0px; 
-                right: 0px; 
+        self.setStyleSheet("""
+            QSlider::groove:horizontal{
+                height: 10px;
+                left: 0px;
+                right: 0px;
                 border-radius:3px;
                 background-color: #E0E0E0;
-            } 
+            }
             QSlider::sub-page:horizontal{
                 border-radius:3px;
                 background-color: #184e83;
@@ -170,7 +165,7 @@ class MainWindow(QWidget):
                 height: 10px;
                 border-radius: 3px;
                 background-color: #FFFFFF;
-                margin: -5px 0;           
+                margin: -5px 0;
             }
             QWidget {
                 background-color: #F0F0F0;
@@ -208,7 +203,7 @@ class MainWindow(QWidget):
                 background-color: #184e83;
                 border-radius: 5px;
             }
-        ''')
+        """)
 
         # 设置窗口标题和固定大小
         self.setWindowTitle('PNG to JPG Converter')

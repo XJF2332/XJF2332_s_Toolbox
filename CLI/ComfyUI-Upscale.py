@@ -2,8 +2,9 @@
 
 import json
 import os
-from urllib import request
 import time
+from urllib import request
+
 import PIL.Image
 import send2trash
 from colorama import init, Fore
@@ -457,15 +458,34 @@ def send_to_trash():
 
 #######################
 
+# 手动发送请求
 def manual():
-    # 手动输入图片路径
-    image_file = input("请输入图片路径：")
-    prompt_text["1"]["inputs"]["image"] = image_file
-    prompt_text["1"]["inputs"]["upload"] = "image"
-    prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(image_file))[0]
-    # 使用更新后的 JSON 调用 queue_prompt 函数
-    queue_prompt(prompt_text)
-    print(f"已发送请求：{image_file}")
+    manual_file = input("请输入图片路径或包含图片路径的txt文件：")
+    if os.path.isfile(manual_file):
+        if manual_file.lower().endswith(
+                ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')) and not manual_file.lower().endswith('.gif'):
+            prompt_text["1"]["inputs"]["image"] = manual_file
+            prompt_text["1"]["inputs"]["upload"] = "image"
+            prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(manual_file))[0]
+            queue_prompt(prompt_text)
+            print(f"已发送请求：{manual_file}")
+        elif manual_file.lower().endswith('.txt'):
+            global image_files
+            image_files = []
+            with open(manual_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            image_files = [line.strip() for line in lines if line.strip().lower().endswith(
+                ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')) and not line.strip().lower().endswith('.gif')]
+            for image_file in image_files:
+                prompt_text["1"]["inputs"]["image"] = image_file
+                prompt_text["1"]["inputs"]["upload"] = "image"
+                prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(image_file))[0]
+                queue_prompt(prompt_text)
+                print(f"已发送请求：{image_file}")
+        else:
+            print("无效的文件路径或文件类型。")
+    else:
+        print("文件路径无效")
 
 #######################
 
