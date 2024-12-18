@@ -1,9 +1,19 @@
 import os
 
+import charset_normalizer
+
+
 def remove_duplicate_lines(input_file_path):
     try:
         seen_lines = []
-        with open(input_file_path, 'r', encoding='utf-8') as file:
+        with open(input_file_path, 'rb') as file:
+            content_bytes = file.read()
+
+        encoding_info = charset_normalizer.detect(content_bytes)
+        print("检测到的编码信息：", encoding_info)
+        encoding = encoding_info['encoding'] if encoding_info else 'utf-8'
+
+        with open(input_file_path, 'r', encoding=encoding) as file:
             for line in file:
                 if line not in seen_lines:
                     seen_lines.append(line)

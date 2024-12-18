@@ -2,63 +2,78 @@ import os
 import re
 import shutil
 
-search_dir = os.path.dirname(os.path.abspath(__file__))
-destination_dir = os.path.join(search_dir, "Copied_Folders")
-regex_pattern = ".*"
-whitelist = set()  # 白名单集合
+def copy_item(src, dest, whitelist, is_dir):
+    if src in whitelist:
+        print(f"{src} 已在白名单中，跳过复制")
+        return
+    if is_dir:
+        try:
+            shutil.copytree(src, dest)
+            print(f"已将 {src} 复制到 {dest}")
+            whitelist.add(src)
+        except FileExistsError:
+            print(f"目标目录 {dest} 已存在，跳过复制")
+    else:
+        shutil.copy2(src, dest)
+        print(f"已将 {src} 复制到 {dest}")
 
-search_dir_change = input(f"请输入要搜索的文件夹路径（当前：{search_dir}）")
-if search_dir_change:
-    search_dir = search_dir_change
-    print(f"搜索文件夹路径已更改为：{search_dir}")
-destination_dir_change = input(f"请输入要复制到的目标文件夹路径（当前：{destination_dir}）")
-if destination_dir_change:
-    destination_dir = destination_dir_change
-    print(f"目标文件夹路径已更改为：{destination_dir}")
-regex_pattern_change = input(f"请输入要匹配的目录名称的正则表达式（当前：{regex_pattern}）")
-if regex_pattern_change:
-    regex_pattern = regex_pattern_change
-    print(f"正则表达式已更改为：{regex_pattern}")
+def main():
+    search_dir = os.path.dirname(os.path.abspath(__file__))
+    destination_dir = os.path.join(search_dir, "Copied_Folders")
+    regex_pattern = ".*"
+    whitelist = set()
 
-# 确保目标文件夹存在
-if not os.path.exists(destination_dir):
-    os.makedirs(destination_dir)
+    search_dir_change = input(f"请输入要搜索的文件夹路径（当前：{search_dir}）")
+    if search_dir_change:
+        search_dir = search_dir_change
+        print(f"搜索文件夹路径已更改为：{search_dir}")
 
-# 遍历目录
-for root, dirs, files in os.walk(search_dir):
-    for dir_name in dirs:
-        # 检查目录名称是否符合正则表达式
-        if re.match(regex_pattern, dir_name):
-            # 构建源目录和目标目录的完整路径
-            src_dir = os.path.join(root, dir_name)
-            dest_dir = os.path.join(destination_dir, dir_name)
+    destination_dir_change = input(f"请输入要复制到的目标文件夹路径（当前：{destination_dir}）")
+    if destination_dir_change:
+        destination_dir = destination_dir_change
+        print(f"目标文件夹路径已更改为：{destination_dir}")
 
-            # 如果目录已在白名单中，则跳过
-            if src_dir in whitelist:
-                continue
+    regex_pattern_change = input(f"请输入要匹配的目录/文件名称的正则表达式（当前：{regex_pattern}）")
+    if regex_pattern_change:
+        regex_pattern = regex_pattern_change
+        print(f"正则表达式已更改为：{regex_pattern}")
 
-            # 复制目录
-            try:
-                shutil.copytree(src_dir, dest_dir)
-                print(f"已将 {src_dir} 复制到 {dest_dir}")
-            except FileExistsError:
-                print(f"目标目录 {dest_dir} 已存在，跳过复制")
+    recursive_input = input("是否递归查找？(Y/N，默认N): ") or "N"
+    recursive = recursive_input.upper() == "Y"
 
-            # 将复制的目录添加到白名单
-            whitelist.add(src_dir)
+    match_dirs_input = input("是否匹配目录？(Y/N，默认Y): ") or "Y"
+    match_dirs = match_dirs_input.upper() == "Y"
 
-            # 将子目录添加到白名单
-            for sub_dir in os.listdir(src_dir):
-                sub_dir_path = os.path.join(src_dir, sub_dir)
-                if os.path.isdir(sub_dir_path):
-                    whitelist.add(sub_dir_path)
+    if not os.path.exists(destination_dir):
+        os.makedirs(destination_dir)
 
-    # 检查目录中的文件是否有符合表达式的
-    for file_name in files:
-        if re.match(regex_pattern, file_name):
-            # 构建源文件和目标文件的完整路径
-            src_file = os.path.join(root, file_name)
-            dest_file = os.path.join(destination_dir, file_name)
-            shutil.copy2(src_file, dest_file)
-            print(f"已将 {src_file} 复制到 {dest_file}")
+    if recursive:
+        for root, dirs, files in os.walk(search_dir):
+            if match_dirs:
+                for dir_name in dirs:
+                    if re.fullmatch(regex_pattern, dir_name):
+                        src_dir = os.path.join(root, dir_name)
+                        relative_path = os.path.relpath(src_dir, search_dir)
+                        dest_dir = os.path.join(destination_dir, relative_path)
+                        os.makedirs(os.path.dirname(dest_dir), exist_ok=True)
+                        copy_item(src_dir, dest_dir, whitelist, True)
+            for file_name in files:
+                if re.fullmatch(regex_pattern, file_name):
+                    src_file = os.path.join(root, file_name)
+                    relative_path = os.path.relpath(src_file, search_dir)
+                    dest_file = os.path.join(destination_dir, relative_path)
+                    os.makedirs(os.path.dirname(dest_file), exist_ok=True)
+                    copy_item(src_file, dest_file, whitelist, False)
+    else:
+        for entry in os.listdir(search_dir):
+            entry_path = os.path.join(search_dir, entry)
+            dest_path = os.path.join(destination_dir, entry)
+            if os.path.isdir(entry_path):
+                if match_dirs and re.fullmatch(regex_pattern, entry):
+                    copy_item(entry_path, dest_path, whitelist, True)
+            elif os.path.isfile(entry_path):
+                if re.fullmatch(regex_pattern, entry):
+                    copy_item(entry_path, dest_path, whitelist, False)
 
+if __name__ == "__main__":
+    main()

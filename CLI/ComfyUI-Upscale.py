@@ -4,7 +4,7 @@ import json
 import os
 import time
 from urllib import request
-
+from tqdm import tqdm
 import PIL.Image
 import send2trash
 from colorama import init, Fore
@@ -432,27 +432,27 @@ def send_request():
     get_image_files()
     input("按回车键开始发送请求")
     # 遍历图片文件并更新 JSON 中的 "image" 值
-    for image_file in image_files:
+    for image_file in tqdm(image_files):
         prompt_text["1"]["inputs"]["image"] = image_file
         prompt_text["1"]["inputs"]["upload"] = "image"
         prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(image_file))[0]
         # 使用更新后的 JSON 调用 queue_prompt 函数
         queue_prompt(prompt_text)
-        print(f"已发送请求：{image_file}")
+        tqdm.write(f"已发送请求：{image_file}")
         # 打印图片分辨率和大小
         current_image = PIL.Image.open(image_file)
-        print(f"    图片分辨率：{current_image.size}")
-        print(f"    图片大小：{os.path.getsize(image_file) / 1024}KB")
+        tqdm.write(f"    图片分辨率：{current_image.size}")
+        tqdm.write(f"    图片大小：{os.path.getsize(image_file) / 1024}KB")
 
 #######################
 
 def send_to_trash():
     # 是否发送原图片文件到回收站
-    del_confirm = input("是否将原图片文件发送到回收站？(y/n): ")
+    del_confirm = input("是否将原图片文件发送到回收站？(Y/[N]): ")
     if del_confirm.lower() == 'y':
-        for image_file in image_files:
+        for image_file in tqdm(image_files):
             send2trash.send2trash(image_file)
-            print(f"已删除文件：{image_file}")
+            tqdm.write(f"已删除文件：{image_file}")
     else:
         print("原图片文件未删除。")
 
@@ -476,12 +476,12 @@ def manual():
                 lines = f.readlines()
             image_files = [line.strip() for line in lines if line.strip().lower().endswith(
                 ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')) and not line.strip().lower().endswith('.gif')]
-            for image_file in image_files:
+            for image_file in tqdm(image_files):
                 prompt_text["1"]["inputs"]["image"] = image_file
                 prompt_text["1"]["inputs"]["upload"] = "image"
                 prompt_text["15"]["inputs"]["filename_prefix"] = os.path.splitext(os.path.basename(image_file))[0]
                 queue_prompt(prompt_text)
-                print(f"已发送请求：{image_file}")
+                tqdm.write(f"已发送请求：{image_file}")
         else:
             print("无效的文件路径或文件类型。")
     else:

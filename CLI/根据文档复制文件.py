@@ -1,16 +1,15 @@
-import shutil
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 
-# input txt path
-txt_path = input("请输入txt文件路径：")
+import charset_normalizer
 
+txt_path = input("请输入txt文件路径：")
 temp_path = "temp"
 
 if not os.path.exists(temp_path):
     os.makedirs(temp_path)
 
-# function to copy file
 def copy_file(file_name):
     if os.path.exists(file_name):
         shutil.copy(file_name, temp_path)
@@ -20,13 +19,17 @@ def copy_file(file_name):
     else:
         print(f"文件不存在：{file_name}")
 
-# read every line in txt
-with open(txt_path, 'r', encoding='utf-8') as f:
+with open(txt_path, 'rb') as file:
+    content_bytes = file.read()
+
+encoding_info = charset_normalizer.detect(content_bytes)
+print("检测到的编码信息：", encoding_info)
+encoding = encoding_info['encoding'] if encoding_info else 'utf-8'
+
+with open(txt_path, 'r', encoding=encoding) as f:
     lines = f.readlines()
 
-# create a thread pool with a maximum of 5 threads
-with ThreadPoolExecutor(max_workers=5) as executor:
-    # submit tasks to the thread pool
+with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
     for line in lines:
         file_name = line.strip()
         executor.submit(copy_file, file_name)

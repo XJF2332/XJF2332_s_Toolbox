@@ -2,19 +2,19 @@ import os
 from PIL import Image
 import send2trash
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QCheckBox, QSlider, QLabel, \
-    QProgressBar, QHBoxLayout
+    QProgressBar, QHBoxLayout, QTextEdit
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 from PySide6.QtGui import QFont
 
 
 # 定义一个函数来处理单个文件的转换和删除
-def process_file(img_name, directory, del_confirm, quality, transparency_trans, preserve_metadata, overwrite):
+def process_file(img_name, directory, del_confirm, quality, transparency_trans, preserve_metadata, overwrite, worker):
     with Image.open(os.path.join(directory, img_name)) as img:
         if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
             if transparency_trans:
-                print(f'{img_name} 含有透明度，但由于自定义设置仍然进行转换')
+                worker.log_signal.emit(f'{img_name} 含有透明度，但由于自定义设置仍然进行转换')
             else:
-                print(f'跳过 {img_name} ，因为它含有透明度')
+                worker.log_signal.emit(f'跳过 {img_name} ，因为它含有透明度')
                 return
 
         # 生成新的文件路径
@@ -22,28 +22,29 @@ def process_file(img_name, directory, del_confirm, quality, transparency_trans, 
 
         # 检查文件是否存在
         if os.path.exists(new_file_path) and not overwrite:
-            print(f'跳过已存在的文件: {new_file_path}')
+            worker.log_signal.emit(f'跳过已存在的文件: {new_file_path}')
             return
 
         if preserve_metadata:
             metadata = img.info
             img = img.convert('RGB')
             img.save(new_file_path, 'JPEG', quality=quality, metadata=metadata)
-            print(f'成功转换 {img_name} 为 {new_file_path}')
+            worker.log_signal.emit(f'成功转换 {img_name} 为 {new_file_path}')
         else:
             img = img.convert('RGB')
             img.save(new_file_path, 'JPEG', quality=quality)
-            print(f'成功转换 {img_name} 为 {new_file_path}')
+            worker.log_signal.emit(f'成功转换 {img_name} 为 {new_file_path}')
 
         if del_confirm:
             send2trash.send2trash(os.path.join(directory, img_name))
-            print(f'已将 {img_name} 发送到回收站')
+            worker.log_signal.emit(f'已将 {img_name} 发送到回收站')
         else:
-            print(f'保留原文件：{img_name}')
+            worker.log_signal.emit(f'保留原文件：{img_name}')
 
 
 class ConversionWorker(QThread):
     progress_signal = Signal(int)
+    log_signal = Signal(str)
 
     def __init__(self, directory, del_confirm, quality, transparency_trans, preserve_metadata, recursive, overwrite):
         super().__init__()
@@ -68,7 +69,7 @@ class ConversionWorker(QThread):
     def run(self):
         for full_path in self.png_files:
             process_file(full_path, self.directory, self.del_confirm, self.quality, self.transparency_trans,
-                         self.preserve_metadata, self.overwrite)
+                         self.preserve_metadata, self.overwrite, self)
             self.count += 1
             self.progress_signal.emit(self.count)
 
@@ -104,6 +105,10 @@ class MainWindow(QWidget):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
 
+        # 添加QTextEdit控件
+        self.log_textedit = QTextEdit()
+        self.log_textedit.setReadOnly(True)
+
         # 布局
         layout = QVBoxLayout()
         layout.setSpacing(10)  # 设置控件之间的间距
@@ -132,6 +137,9 @@ class MainWindow(QWidget):
         # 添加开始按钮和进度条
         layout.addWidget(self.start_button)
         layout.addWidget(self.progress_bar)
+
+        # 添加日志文本框
+        layout.addWidget(self.log_textedit)
 
         self.setLayout(layout)
 
@@ -180,7 +188,12 @@ class MainWindow(QWidget):
             }
             QPushButton:hover {
                 border-radius: 5px;
-                background-color: #184e83;
+                background-color: #267bcf;
+            }
+            QPushButton:pressed {
+                border-radius: 5px;
+                background-color: #123d69;
+                padding: 6px 9px;
             }
             QCheckBox {
                 color: #333333;
@@ -203,10 +216,48 @@ class MainWindow(QWidget):
                 background-color: #184e83;
                 border-radius: 5px;
             }
+            QTextEdit {
+                background-color: #FFFFFF;
+                color: #333333;
+                border: 1px solid #CCCCCC;
+                border-radius: 5px;
+                font-size: 10pt;
+                padding: 5px;
+            }
+            QScrollBar:vertical {
+                width: 10px;
+                background-color: #F0F0F0;
+            }
+            QScrollBar::groove:vertical {
+                background-color: #E0E0E0;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #184e83;
+                min-height: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #267bcf;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background-color: #123d69;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
         """)
 
         # 设置窗口标题和固定大小
         self.setWindowTitle('PNG to JPG Converter')
+
+    @Slot()
+    def log_message(self, message):
+        self.log_textedit.append(message)
 
     def choose_directory(self):
         dir_name = QFileDialog.getExistingDirectory(self, '选择目录')
@@ -221,7 +272,7 @@ class MainWindow(QWidget):
 
     def start_conversion(self):
         if not self.directory:
-            print('未选择目录')
+            self.log_textedit.append('未选择目录')
             return
 
         self.del_confirm = self.del_checkbox.isChecked()
@@ -242,7 +293,7 @@ class MainWindow(QWidget):
             png_files = [f for f in os.listdir(self.directory) if f.endswith('.png')]
         total = len(png_files)
         if total == 0:
-            print('没有找到PNG文件')
+            self.log_textedit.append('没有找到PNG文件')
             return
 
         # 设置进度条最大值
@@ -253,6 +304,7 @@ class MainWindow(QWidget):
         self.worker = ConversionWorker(self.directory, self.del_confirm, self.quality, self.transparency_trans,
                                        self.preserve_metadata, self.recursive, self.overwrite)
         self.worker.progress_signal.connect(self.update_progress)
+        self.worker.log_signal.connect(self.log_message)
         self.worker.start()
 
     def update_progress(self, value):
