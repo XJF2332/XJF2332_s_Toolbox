@@ -4,6 +4,7 @@ import send2trash
 from PySide6 import QtWidgets, QtCore
 
 def find_files(directory, regex_pattern):
+    directory = directory.replace("/", os.sep)
     pattern = re.compile(regex_pattern)
     matching_files = []
     for root, dirs, files in os.walk(directory):
@@ -58,6 +59,120 @@ class MainWindow(QtWidgets.QWidget):
 
         # 初始文件列表更新
         self.update_file_list()
+
+        self.setStyleSheet("""
+            QSlider::groove:horizontal{
+                height: 10px;
+                left: 0px;
+                right: 0px;
+                border-radius:3px;
+                background-color: #E0E0E0;
+            }
+            QSlider::sub-page:horizontal{
+                border-radius:3px;
+                background-color: #184e83;
+            }
+            QSlider::handle:horizontal{
+                width: 10px;
+                height: 10px;
+                border-radius: 3px;
+                background-color: #FFFFFF;
+                margin: -5px 0;
+            }
+            QWidget {
+                background-color: #F0F0F0;
+            }
+            QPushButton {
+                border-radius: 5px;
+                background-color: #184e83;
+                color: white;
+                border: none;
+                padding: 7px;
+            }
+            QPushButton:hover {
+                border-radius: 5px;
+                background-color: #267bcf;
+            }
+            QPushButton:pressed {
+                border-radius: 5px;
+                background-color: #123d69;
+                padding: 6px 9px;
+            }
+            QCheckBox {
+                color: #333333;
+                font-size: 10pt;
+            }
+            QLabel {
+                color: #333333;
+                font-size: 10pt;
+            }
+            QProgressBar {
+                border: 1px solid #CCCCCC;
+                border-radius: 5px;
+                background-color: #E0E0E0;
+                color: #000000;
+                border-style: none;
+                border-radius: 5px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #184e83;
+                border-radius: 5px;
+            }
+            QLineEdit {
+                color: #333333;
+                border: 1px solid #CCCCCC;
+                border-radius: 5px;
+                font-size: 10pt;
+                padding: 5px;
+            }
+            QScrollBar:vertical {
+                width: 10px;
+                background-color: #F0F0F0;
+            }
+            QScrollBar:horizontal {
+                height: 10px;
+                background-color: #F0F0F0;
+            }    
+            QScrollBar::groove {
+                background-color: #E0E0E0;
+                border-radius: 3px;
+            }
+            QScrollBar::handle {
+                background-color: #184e83;
+                min-height: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:hover {
+                background-color: #267bcf;
+            }
+            QScrollBar::handle:pressed {
+                background-color: #123d69;
+            }
+            QScrollBar::add-line, QScrollBar::sub-line {
+                height: 0px;
+                background: none;
+            }
+            QScrollBar::add-page, QScrollBar::sub-page {
+                background: none;
+            }
+            QListWidget {
+                background-color: #FAFAFA;
+                border: 1px solid #CCCCCC;
+                border-radius: 5px;
+                font-size: 11pt;
+                padding: 5px;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #CCCCCC;            
+            }
+            QListWidget::item:selected {
+                background-color: #184e83;
+                color: white;
+                
+            }
+        """)
 
     def choose_directory(self):
         directory = QtWidgets.QFileDialog.getExistingDirectory(self, "选择目录", self.current_directory)

@@ -1,6 +1,7 @@
 import os
 import send2trash
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 def get_folder_path():
     folder_path = input("请输入要处理的文件夹路径：")
@@ -63,11 +64,12 @@ def process_folder(folder_path):
 
 def main():
     folder_path = get_folder_path()
-    for root, dirs, files in os.walk(folder_path, topdown=False):
-        for dir_name in dirs:
-            dir_path = os.path.join(root, dir_name)
-            process_folder(dir_path)
+    max_threads = os.cpu_count() // 2
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
+        top_level_dirs = [os.path.join(folder_path, d) for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))]
+        for dir_path in top_level_dirs:
+            executor.submit(process_folder, dir_path)
 
 if __name__ == "__main__":
     main()
-    input("按回车键退出。")
+    input("按回车键退出程序。")
